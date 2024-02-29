@@ -33,7 +33,7 @@ long unsigned int strlen(const char* s) {
 int main(int argc, char* argv[]) {
 //	for (int i = 0; i < argc; i++) {
 //		printf("strlen(\"%s\"): %u\n", argv[i], (unsigned int)strlen(argv[i]));
-	}
+//	}
 
 	WC_Print_Options options;	
 
@@ -95,21 +95,16 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	printf("filenames: ");
 	for (int i = 0; i < fn_len; i++) {
 				
-		if (option & OPTION_LINE_COUNT) {}
-		if (option & OPTION_WORD_COUNT) {}
-		if (option & OPTION_CHAR_COUNT) {}
-		if (option & OPTION_BYTE_COUNT) {
-
-		}
-		if (option & OPTION_LINE_LENGTH) {}
+		if (options & OPTION_LINE_COUNT) {}
+		if (options & OPTION_WORD_COUNT) {}
+		if (options & OPTION_CHAR_COUNT) {}
+		if (options & OPTION_BYTE_COUNT) {}
+		if (options & OPTION_LINE_LENGTH) {}
 		
-		printf("%s, ", file_names[i]);
+		printf("%s\n, ", file_names[i]);
 	}
-	printf("\n");
-
 
 	return 0;
 }
