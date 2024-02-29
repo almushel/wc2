@@ -30,6 +30,20 @@ long unsigned int strlen(const char* s) {
 	return result;
 }
 
+int strcmp(const char *lhs, const char *rhs) {
+	unsigned char lc, rc;
+	int i = 0;
+
+	do {
+		lc = lhs[i];
+		rc = rhs[i];
+		i++;
+	} while (lc == rc && lc != '\0');
+
+		
+	return lc-rc;
+}
+
 char* fread_all(FILE* stream, size_t* size) {
 	size_t cap = sizeof(char) * 1024;
 	char* result = malloc(cap);
@@ -78,14 +92,29 @@ int main(int argc, char* argv[]) {
 			
 			if (arg[0] == '-') {
 				if (arg[1] == '-') {
-				// Handle '--word' options
-				// --bytes
-				// --chars
-				// --lines
-				// --max-line-length
-				// --words
+					// TODO: Handle '--' option
+					if (strcmp(arg+2, "bytes") == 0) {
+						options |= OPTION_BYTE_COUNT;
+					}
+					else if (strcmp(arg+2, "chars") == 0) {
+						options |= OPTION_CHAR_COUNT;
+					}
+					else if (strcmp(arg+2, "lines") == 0) {
+						options |= OPTION_LINE_COUNT;
+					}
+					else if (strcmp(arg+2, "max-line-length") == 0) {
+						options |= OPTION_LINE_LENGTH;
+					}
+					else if (strcmp(arg+2, "words") == 0) {
+						options |= OPTION_WORD_COUNT;
+					}
+					else {
+						printf("wc2: invalid option: %s\n", arg);
+						printf("Try 'wc2 --help' for more information.\n");
+						exit(1);
+					}
 				} else if (len == 2) {
-				// Handle '-x' options	
+					// Handle '-x' options
 					switch(arg[1]) {
 						case 'c':
 							options |= OPTION_BYTE_COUNT;
@@ -103,7 +132,9 @@ int main(int argc, char* argv[]) {
 							options |= OPTION_WORD_COUNT;
 							break;
 						default:
-							//Invalid option
+							printf("wc2: invalid option: %s\n", arg);
+							printf("Try 'wc2 --help' for more information.\n");
+							exit(1);
 							break;
 					}
 				} 
