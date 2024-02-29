@@ -30,6 +30,31 @@ long unsigned int strlen(const char* s) {
 	return result;
 }
 
+char* fread_all(FILE* stream, size_t* size) {
+	size_t cap = sizeof(char) * 1024;
+	char* result = malloc(cap);
+	size_t read = 0;
+
+	*size = 0;
+	while (read = fread(result + *size, sizeof(char), 1024, stream)) {
+		*size += read;	
+		if (*size >= cap) {
+			cap *= 2;
+			char* r = realloc(result, cap);
+			if (r != NULL) {
+				result = r;
+			}
+		}
+	}
+
+	char* r = realloc(result, *size);
+	if (r != NULL) {
+		result = r;
+	}
+
+	return result;
+}
+
 int main(int argc, char* argv[]) {
 //	for (int i = 0; i < argc; i++) {
 //		printf("strlen(\"%s\"): %u\n", argv[i], (unsigned int)strlen(argv[i]));
@@ -96,14 +121,28 @@ int main(int argc, char* argv[]) {
 	}
 
 	for (int i = 0; i < fn_len; i++) {
-				
-		if (options & OPTION_LINE_COUNT) {}
-		if (options & OPTION_WORD_COUNT) {}
-		if (options & OPTION_CHAR_COUNT) {}
-		if (options & OPTION_BYTE_COUNT) {}
-		if (options & OPTION_LINE_LENGTH) {}
-		
-		printf("%s\n, ", file_names[i]);
+		printf("wc2: ");
+		FILE* fstream = fopen(file_names[i], "r");
+		if (fstream != NULL) {
+			size_t len = 0;
+			char* buf = fread_all(fstream, &len);
+			if (len > 0) {
+				if (options & OPTION_LINE_COUNT) {}
+				if (options & OPTION_WORD_COUNT) {}
+				if (options & OPTION_CHAR_COUNT) {}
+				if (options & OPTION_BYTE_COUNT) {
+					printf("%zu ", len);
+				}
+				if (options & OPTION_LINE_LENGTH) {}
+
+				free(buf);
+			}
+			printf("%s\n", file_names[i]);
+			fclose(fstream);
+		} else {
+			printf("%s: No such file or directory\n", file_names[i]);			
+		}
+
 	}
 
 	return 0;
