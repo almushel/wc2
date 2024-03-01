@@ -1,2 +1,2 @@
-# wc
-Recreating the wc utility
+# wc2
+Recreating the Unix wc utility.

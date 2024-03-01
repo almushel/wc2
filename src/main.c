@@ -1,15 +1,20 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #define array_len(arr) sizeof(arr) / sizeof(arr[0])
 
 typedef enum WC_Print_Options {
-	OPTION_BYTE_COUNT = 1,	// -c, --bytes
-	OPTION_CHAR_COUNT,	// -m, --chars
-	OPTION_LINE_COUNT,	// -l, --lines
-	OPTION_WORD_COUNT,	// -w, --words
-	OPTION_LINE_LENGTH	// -L, --max-line-length
+	OPTION_BYTE_COUNT = 1 << 0,	// -c, --bytes
+	OPTION_CHAR_COUNT = 1 << 1,	// -m, --chars
+	OPTION_LINE_COUNT = 1 << 2,	// -l, --lines
+	OPTION_WORD_COUNT = 1 << 3,	// -w, --words
+	OPTION_LINE_LENGTH = 1<< 4	// -L, --max-line-length
 } WC_Print_Options;
+
+typedef struct WC_Results {
+	uint64_t bc, cc, lc, wc, ml;
+} WC_Results;
 
 long unsigned int strlen(const char* s) {
 	if (s[0] == '\0') {
@@ -44,6 +49,58 @@ int strcmp(const char *lhs, const char *rhs) {
 	return lc-rc;
 }
 
+int isspace(int ch) {
+	return (int)(
+		ch == ' ' 	||
+		ch == '\f'	||
+		ch == '\n'	||
+		ch == '\r'	||
+		ch == '\t'	||
+		ch == '\v'
+	);	
+}
+
+// TODO: Support for multi-byte characters
+WC_Results wc2(char* buf) {
+	WC_Results result = {};
+	uint64_t word_length = 0;
+	uint64_t line_length = 0;
+	int i = 0, c = 0; // u, p
+
+	while(1) {
+		c = buf[i++];
+		if (c == '\0') {
+			break;
+		} else if (c == '\n') {
+			// TODO: Handle goofy shit like \r\n line endings?
+			if (line_length > result.ml) {
+				result.ml = line_length;
+			}
+			if (word_length > 0) {
+				result.wc++;
+			}
+
+			result.lc++;
+			line_length = 0;
+			word_length = 0;
+		} else if (isspace(c)) {
+			if (word_length > 0) {
+				result.wc++;
+			}
+			word_length = 0;
+		} else {
+			word_length++;
+			line_length++;
+		}
+
+	}
+
+	result.bc = i+1;
+	result.cc = i+1;
+
+	return result;
+}
+
 char* fread_all(FILE* stream, size_t* size) {
 	size_t cap = sizeof(char) * 1024;
 	char* result = malloc(cap);
@@ -74,7 +131,7 @@ int main(int argc, char* argv[]) {
 //		printf("strlen(\"%s\"): %u\n", argv[i], (unsigned int)strlen(argv[i]));
 //	}
 
-	WC_Print_Options options;	
+	WC_Print_Options options = 0;	
 
 	size_t fn_cap = 8;
 	size_t fn_len = 0;
@@ -93,20 +150,20 @@ int main(int argc, char* argv[]) {
 			if (arg[0] == '-') {
 				if (arg[1] == '-') {
 					// TODO: Handle '--' option
-					if (strcmp(arg+2, "bytes") == 0) {
-						options |= OPTION_BYTE_COUNT;
+					if (strcmp(arg+2, "lines") == 0) {
+						options |= OPTION_LINE_COUNT;
+					}
+					else if (strcmp(arg+2, "words") == 0) {
+						options |= OPTION_WORD_COUNT;
 					}
 					else if (strcmp(arg+2, "chars") == 0) {
 						options |= OPTION_CHAR_COUNT;
 					}
-					else if (strcmp(arg+2, "lines") == 0) {
-						options |= OPTION_LINE_COUNT;
+					else if (strcmp(arg+2, "bytes") == 0) {
+						options |= OPTION_BYTE_COUNT;
 					}
 					else if (strcmp(arg+2, "max-line-length") == 0) {
 						options |= OPTION_LINE_LENGTH;
-					}
-					else if (strcmp(arg+2, "words") == 0) {
-						options |= OPTION_WORD_COUNT;
 					}
 					else {
 						printf("wc2: invalid option: %s\n", arg);
@@ -116,20 +173,20 @@ int main(int argc, char* argv[]) {
 				} else if (len == 2) {
 					// Handle '-x' options
 					switch(arg[1]) {
-						case 'c':
-							options |= OPTION_BYTE_COUNT;
+						case 'l':
+							options |= OPTION_LINE_COUNT;
+							break;
+						case 'w':
+							options |= OPTION_WORD_COUNT;
 							break;
 						case 'm':
 							options |= OPTION_CHAR_COUNT;
 							break;
-						case 'l':
-							options |= OPTION_LINE_COUNT;
+						case 'c':
+							options |= OPTION_BYTE_COUNT;
 							break;
 						case 'L':
 							options |= OPTION_LINE_LENGTH;
-							break;
-						case 'w':
-							options |= OPTION_WORD_COUNT;
 							break;
 						default:
 							printf("wc2: invalid option: %s\n", arg);
@@ -151,20 +208,36 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
+	if (options == 0) {
+		options = OPTION_LINE_COUNT | OPTION_WORD_COUNT | OPTION_BYTE_COUNT;
+	}
+
 	for (int i = 0; i < fn_len; i++) {
-		printf("wc2: ");
 		FILE* fstream = fopen(file_names[i], "r");
 		if (fstream != NULL) {
 			size_t len = 0;
 			char* buf = fread_all(fstream, &len);
+
 			if (len > 0) {
-				if (options & OPTION_LINE_COUNT) {}
-				if (options & OPTION_WORD_COUNT) {}
-				if (options & OPTION_CHAR_COUNT) {}
-				if (options & OPTION_BYTE_COUNT) {
-					printf("%zu ", len);
+				WC_Results counts = wc2(buf);
+				counts.bc = len;
+
+				if (options & OPTION_LINE_COUNT) {
+					printf("%zu ", counts.lc);
 				}
-				if (options & OPTION_LINE_LENGTH) {}
+				if (options & OPTION_WORD_COUNT) {
+					printf("%zu ", counts.wc);
+				}
+				// NOTE: Currently incorrect, likely due to multi-byte characters
+				if (options & OPTION_CHAR_COUNT) {
+					printf("%zu ", counts.cc);
+				}
+				if (options & OPTION_BYTE_COUNT) {
+					printf("%zu ", counts.bc);
+				}
+				if (options & OPTION_LINE_LENGTH) {
+					printf("%zu ", counts.ml);
+				}
 
 				free(buf);
 			}
