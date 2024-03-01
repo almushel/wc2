@@ -60,47 +60,6 @@ int isspace(int ch) {
 	);	
 }
 
-// TODO: Support for multi-byte characters
-WC_Results wc2(char* buf) {
-	WC_Results result = {};
-	uint64_t word_length = 0;
-	uint64_t line_length = 0;
-	int i = 0, c = 0; // u, p
-
-	while(1) {
-		c = buf[i++];
-		if (c == '\0') {
-			break;
-		} else if (c == '\n') {
-			// TODO: Handle goofy shit like \r\n line endings?
-			if (line_length > result.ml) {
-				result.ml = line_length;
-			}
-			if (word_length > 0) {
-				result.wc++;
-			}
-
-			result.lc++;
-			line_length = 0;
-			word_length = 0;
-		} else if (isspace(c)) {
-			if (word_length > 0) {
-				result.wc++;
-			}
-			word_length = 0;
-		} else {
-			word_length++;
-			line_length++;
-		}
-
-	}
-
-	result.bc = i+1;
-	result.cc = i+1;
-
-	return result;
-}
-
 char* fread_all(FILE* stream, size_t* size) {
 	size_t cap = sizeof(char) * 1024;
 	char* result = malloc(cap);
@@ -124,6 +83,63 @@ char* fread_all(FILE* stream, size_t* size) {
 	}
 
 	return result;
+}
+
+// TODO: Support for multi-byte characters
+WC_Results wc2(char* buf) {
+	WC_Results result = {};
+	uint64_t word_length = 0;
+	uint64_t line_length = 0;
+	int i = 0, c = 0; // u, p
+
+	while(1) {
+		c = buf[i++];
+		if (c == '\0') {
+			break;
+		} else if (isspace(c)) {
+			// TODO: Handle goofy shit like \r\n line endings?
+			if (c == '\n') {
+				if (line_length > result.ml) {
+					result.ml = line_length;
+				}
+				result.lc++;
+				line_length = 0;
+			}
+
+			if (word_length > 0) {
+				result.wc++;
+			}
+			word_length = 0;
+		} else {
+			word_length++;
+			line_length++;
+		}
+
+	}
+
+	result.bc = i+1;
+	result.cc = i+1;
+
+	return result;
+}
+
+void print_wc2(WC_Results results, WC_Print_Options options) {
+	if (options & OPTION_LINE_COUNT) {
+		printf(" %zu", results.lc);
+	}
+	if (options & OPTION_WORD_COUNT) {
+		printf(" %zu", results.wc);
+	}
+	// NOTE: Currently incorrect, likely due to multi-byte characters
+	if (options & OPTION_CHAR_COUNT) {
+		printf(" %zu", results.cc);
+	}
+	if (options & OPTION_BYTE_COUNT) {
+		printf(" %zu", results.bc);
+	}
+	if (options & OPTION_LINE_LENGTH) {
+		printf(" %zu", results.ml);
+	}
 }
 
 int main(int argc, char* argv[]) {
@@ -212,6 +228,18 @@ int main(int argc, char* argv[]) {
 		options = OPTION_LINE_COUNT | OPTION_WORD_COUNT | OPTION_BYTE_COUNT;
 	}
 
+	if (fn_len == 0) {
+		size_t len = 0;
+		char* buf = fread_all(stdin, &len);
+		if (len > 0) {
+			WC_Results results = wc2(buf);
+			results.bc = len;
+			print_wc2(results, options);
+			printf("\n");
+			free(buf);
+		}
+	}
+
 	for (int i = 0; i < fn_len; i++) {
 		FILE* fstream = fopen(file_names[i], "r");
 		if (fstream != NULL) {
@@ -221,32 +249,14 @@ int main(int argc, char* argv[]) {
 			if (len > 0) {
 				WC_Results counts = wc2(buf);
 				counts.bc = len;
-
-				if (options & OPTION_LINE_COUNT) {
-					printf("%zu ", counts.lc);
-				}
-				if (options & OPTION_WORD_COUNT) {
-					printf("%zu ", counts.wc);
-				}
-				// NOTE: Currently incorrect, likely due to multi-byte characters
-				if (options & OPTION_CHAR_COUNT) {
-					printf("%zu ", counts.cc);
-				}
-				if (options & OPTION_BYTE_COUNT) {
-					printf("%zu ", counts.bc);
-				}
-				if (options & OPTION_LINE_LENGTH) {
-					printf("%zu ", counts.ml);
-				}
-
+				print_wc2(counts, options);
 				free(buf);
 			}
-			printf("%s\n", file_names[i]);
+			printf(" %s\n", file_names[i]);
 			fclose(fstream);
 		} else {
 			printf("%s: No such file or directory\n", file_names[i]);			
 		}
-
 	}
 
 	return 0;
