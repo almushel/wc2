@@ -5,17 +5,18 @@
 #define array_len(arr) sizeof(arr) / sizeof(arr[0])
 
 typedef enum WC_Print_Options {
-	OPTION_BYTE_COUNT = 1 << 0,	// -c, --bytes
-	OPTION_CHAR_COUNT = 1 << 1,	// -m, --chars
-	OPTION_LINE_COUNT = 1 << 2,	// -l, --lines
-	OPTION_WORD_COUNT = 1 << 3,	// -w, --words
-	OPTION_LINE_LENGTH = 1<< 4	// -L, --max-line-length
+	OPTION_BYTE_COUNT  = 1 << 0,	// -c, --bytes
+	OPTION_CHAR_COUNT  = 1 << 1,	// -m, --chars
+	OPTION_LINE_COUNT  = 1 << 2,	// -l, --lines
+	OPTION_WORD_COUNT  = 1 << 3,	// -w, --words
+	OPTION_LINE_LENGTH = 1 << 4	// -L, --max-line-length
 } WC_Print_Options;
 
 typedef struct WC_Results {
 	uint64_t bc, cc, lc, wc, ml;
 } WC_Results;
 
+// NOTE: Not beings used anymore!
 long unsigned int strlen(const char* s) {
 	if (s[0] == '\0') {
 		return 0;
@@ -143,52 +144,45 @@ void print_wc2(WC_Results results, WC_Print_Options options) {
 }
 
 int main(int argc, char* argv[]) {
-//	for (int i = 0; i < argc; i++) {
-//		printf("strlen(\"%s\"): %u\n", argv[i], (unsigned int)strlen(argv[i]));
-//	}
-
 	WC_Print_Options options = 0;	
 
 	size_t fn_cap = 8;
 	size_t fn_len = 0;
 	char** file_names = malloc(sizeof(char*) * fn_cap);
 
-	if (argc == 1) {
-		// Attempt to read from stdin
-		// Else error and return
-	} else {
-		for (int i = 1; i < argc; i++) {
-			char* arg = argv[i];
-			size_t len = strlen(arg);
+	int end_options = 0;
 
-			// printf("%s", arg);
-			
-			if (arg[0] == '-') {
-				if (arg[1] == '-') {
-					// TODO: Handle '--' option
-					if (strcmp(arg+2, "lines") == 0) {
-						options |= OPTION_LINE_COUNT;
-					}
-					else if (strcmp(arg+2, "words") == 0) {
-						options |= OPTION_WORD_COUNT;
-					}
-					else if (strcmp(arg+2, "chars") == 0) {
-						options |= OPTION_CHAR_COUNT;
-					}
-					else if (strcmp(arg+2, "bytes") == 0) {
-						options |= OPTION_BYTE_COUNT;
-					}
-					else if (strcmp(arg+2, "max-line-length") == 0) {
-						options |= OPTION_LINE_LENGTH;
-					}
-					else {
-						printf("wc2: invalid option: %s\n", arg);
-						printf("Try 'wc2 --help' for more information.\n");
-						exit(1);
-					}
-				} else if (len == 2) {
-					// Handle '-x' options
-					switch(arg[1]) {
+	for (int i = 1; i < argc; i++) {
+		char* arg = argv[i];
+		
+		if (arg[0] == '-' && !end_options) {
+			if (arg[1] == '-') { // Handle -- options
+				if (arg[2] == '\0') {
+					end_options = 1;
+				}
+				else if (strcmp(arg+2, "lines") == 0) {
+					options |= OPTION_LINE_COUNT;
+				}
+				else if (strcmp(arg+2, "words") == 0) {
+					options |= OPTION_WORD_COUNT;
+				}
+				else if (strcmp(arg+2, "chars") == 0) {
+					options |= OPTION_CHAR_COUNT;
+				}
+				else if (strcmp(arg+2, "bytes") == 0) {
+					options |= OPTION_BYTE_COUNT;
+				}
+				else if (strcmp(arg+2, "max-line-length") == 0) {
+					options |= OPTION_LINE_LENGTH;
+				}
+				else {
+					printf("wc2: invalid option: %s\n", arg);
+					printf("Try 'wc2 --help' for more information.\n");
+					exit(1);
+				}
+			} else { // Handle - options
+				for (int i = 1; arg[i] != '\0'; i++) {
+					switch(arg[i]) {
 						case 'l':
 							options |= OPTION_LINE_COUNT;
 							break;
@@ -210,17 +204,17 @@ int main(int argc, char* argv[]) {
 							exit(1);
 							break;
 					}
-				} 
-			} else {
-				if(fn_len >= fn_cap) {
-					fn_cap *= 2;
-					char** fn_new = realloc(file_names, sizeof(char*) * fn_cap);
-					if (fn_new) {
-						file_names = fn_new;
-					}
 				}
-				file_names[fn_len++] = arg;
+			} 
+		} else {
+			if(fn_len >= fn_cap) {
+				fn_cap *= 2;
+				char** fn_new = realloc(file_names, sizeof(char*) * fn_cap);
+				if (fn_new) {
+					file_names = fn_new;
+				}
 			}
+			file_names[fn_len++] = arg;
 		}
 	}
 
