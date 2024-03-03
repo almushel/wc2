@@ -143,6 +143,16 @@ void print_wc2(WC_Results results, WC_Print_Options options) {
 	}
 }
 
+static inline WC_Results wc2_sum(WC_Results first, WC_Results second) {
+	return (WC_Results){
+		.bc = first.bc + second.bc,
+		.cc = first.cc + second.cc,
+		.lc = first.lc + second.lc,
+		.wc = first.wc + second.wc,
+		.ml = first.ml + second.ml
+	};
+}
+
 int main(int argc, char* argv[]) {
 	WC_Print_Options options = 0;	
 
@@ -222,13 +232,14 @@ int main(int argc, char* argv[]) {
 		options = OPTION_LINE_COUNT | OPTION_WORD_COUNT | OPTION_BYTE_COUNT;
 	}
 
+	WC_Results result, total = {};
 	if (fn_len == 0) {
-		size_t len = 0;
-		char* buf = fread_all(stdin, &len);
-		if (len > 0) {
-			WC_Results results = wc2(buf);
-			results.bc = len;
-			print_wc2(results, options);
+		char* buf = fread_all(stdin, &result.bc);
+		if (result.bc > 0) {
+			result = wc2(buf);
+			total = wc2_sum(total, result);
+
+			print_wc2(result, options);
 			printf("\n");
 			free(buf);
 		}
@@ -238,12 +249,12 @@ int main(int argc, char* argv[]) {
 		FILE* fstream = fopen(file_names[i], "r");
 		if (fstream != NULL) {
 			size_t len = 0;
-			char* buf = fread_all(fstream, &len);
+			char* buf = fread_all(fstream, &result.bc);
 
-			if (len > 0) {
-				WC_Results counts = wc2(buf);
-				counts.bc = len;
-				print_wc2(counts, options);
+			if (result.bc > 0) {
+				result = wc2(buf);
+				total = wc2_sum(total, result);
+				print_wc2(result, options);
 				free(buf);
 			}
 			printf(" %s\n", file_names[i]);
@@ -251,6 +262,11 @@ int main(int argc, char* argv[]) {
 		} else {
 			printf("%s: No such file or directory\n", file_names[i]);			
 		}
+	}
+
+	if (fn_len >= 2) {
+		print_wc2(total, options);
+		printf(" total\n");
 	}
 
 	return 0;
