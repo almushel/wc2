@@ -7,4 +7,4 @@ if [ ! -d $BIN_DIR ]; then
 	mkdir $BIN_DIR
 fi
 
-gcc $SRC_DIR/main.c -o $BIN_DIR/wc2
+gcc $SRC_DIR/main.c -g -o $BIN_DIR/wc2

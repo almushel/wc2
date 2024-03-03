@@ -16,6 +16,17 @@ typedef struct WC_Results {
 	uint64_t bc, cc, lc, wc, ml;
 } WC_Results;
 
+size_t uintlen(uint64_t val) {
+	size_t result = 0;
+
+	do {
+		result++;
+	}
+	while((val /= 10));
+
+	return result;
+}
+
 // NOTE: Not beings used anymore!
 long unsigned int strlen(const char* s) {
 	if (s[0] == '\0') {
@@ -124,23 +135,74 @@ WC_Results wc2(char* buf) {
 	return result;
 }
 
-void print_wc2(WC_Results results, WC_Print_Options options) {
+static inline WC_Results wc2_max_cols(WC_Results results, WC_Results cols) {
+	uint64_t col = 0;
+	if ( cols.bc < (col = uintlen(results.bc))) {
+		cols.bc = col;
+	}
+	if ( cols.cc < (col = uintlen(results.cc))) {
+		cols.cc = col;
+	}
+	if ( cols.lc < (col = uintlen(results.lc))) {
+		cols.lc = col;
+	}
+	if ( cols.wc < (col = uintlen(results.wc))) {
+		cols.wc = col;
+	}
+	if ( cols.ml < (col = uintlen(results.ml))) {
+		cols.ml = col;
+	}
+
+	return cols;
+}
+
+void sprint_wc2_field(char* buf, uint64_t col, uint64_t field) {
+	int64_t padding = (int64_t)col - (int64_t)uintlen(field);
+	if (padding < 0) padding = 0;
+	for (int i = 0; i < padding; i++) {
+		buf[i] = ' ';
+	}
+	sprintf(buf+padding, "%zu", field);
+}
+
+void print_wc2(WC_Results results, WC_Results cols, WC_Print_Options options) {
+	size_t widest = 0;
+	if (widest < cols.lc) widest = cols.lc;
+	if (widest < cols.wc) widest = cols.wc;
+	if (widest < cols.cc) widest = cols.cc;
+	if (widest < cols.bc) widest = cols.bc;
+	if (widest < cols.ml) widest = cols.ml;
+
+	size_t buflen = sizeof(char) * widest * 2;
+	char* buf = malloc(buflen);
+	if (!buf) {
+		fprintf(stderr, "print_wc2(): Failed to allocate %zu bytes\n", buflen);
+		exit(1);
+	}
+
 	if (options & OPTION_LINE_COUNT) {
-		printf(" %zu", results.lc);
+		sprint_wc2_field(buf, cols.lc, results.lc);
+		printf("%s ", buf);
 	}
 	if (options & OPTION_WORD_COUNT) {
-		printf(" %zu", results.wc);
+		sprint_wc2_field(buf, cols.wc, results.wc);
+		printf("%s ", buf);
 	}
 	// NOTE: Currently incorrect, likely due to multi-byte characters
 	if (options & OPTION_CHAR_COUNT) {
-		printf(" %zu", results.cc);
+		sprint_wc2_field(buf, cols.cc, results.cc);
+		printf("%s ", buf);
 	}
 	if (options & OPTION_BYTE_COUNT) {
-		printf(" %zu", results.bc);
+		sprint_wc2_field(buf, cols.bc, results.bc);
+		printf("%s ", buf);
 	}
 	if (options & OPTION_LINE_LENGTH) {
-		printf(" %zu", results.ml);
+		sprint_wc2_field(buf, cols.ml, results.ml);
+		printf("%s ", buf);
 	}
+
+	free(buf);
 }
 
 static inline WC_Results wc2_sum(WC_Results first, WC_Results second) {
@@ -232,41 +294,61 @@ int main(int argc, char* argv[]) {
 		options = OPTION_LINE_COUNT | OPTION_WORD_COUNT | OPTION_BYTE_COUNT;
 	}
 
-	WC_Results result, total = {};
-	if (fn_len == 0) {
-		char* buf = fread_all(stdin, &result.bc);
-		if (result.bc > 0) {
-			result = wc2(buf);
-			total = wc2_sum(total, result);
-
-			print_wc2(result, options);
-			printf("\n");
-			free(buf);
-		}
-	}
+	WC_Results* results = malloc(sizeof(WC_Results) * (fn_len+1));
+	WC_Results total = {}, cols = {};
 
 	for (int i = 0; i < fn_len; i++) {
 		FILE* fstream = fopen(file_names[i], "r");
 		if (fstream != NULL) {
 			size_t len = 0;
-			char* buf = fread_all(fstream, &result.bc);
+			char* buf = fread_all(fstream, &results[i].bc);
 
-			if (result.bc > 0) {
-				result = wc2(buf);
-				total = wc2_sum(total, result);
-				print_wc2(result, options);
+			if (results[i].bc > 0) {
+				results[i] = wc2(buf);
+				cols = wc2_max_cols(results[i], cols);
+				total = wc2_sum(total, results[i]);
 				free(buf);
 			}
-			printf(" %s\n", file_names[i]);
 			fclose(fstream);
 		} else {
 			printf("%s: No such file or directory\n", file_names[i]);			
 		}
 	}
 
+	if (fn_len == 0) {
+		char* buf = fread_all(stdin, &results[0].bc);
+		if (results[0].bc > 0) {
+			results[0] = wc2(buf);
+			cols = (WC_Results){7,7,7,7,7};
+			cols = wc2_max_cols(results[0], cols);
+
+			file_names[0] = "";
+			fn_len++;
+			free(buf);
+		}
+	}
+
+
 	if (fn_len >= 2) {
-		print_wc2(total, options);
-		printf(" total\n");
+		cols = wc2_max_cols(total, cols);
+
+		for (int i = 0; i < fn_len; i++) {
+			printf(" ");
+			print_wc2(results[i], cols, options);
+			printf("%s\n", file_names[i]);
+		}
+		printf(" ");
+		print_wc2(total, cols, options);
+		printf("total\n");
+	} else {
+		uint64_t cm = cols.bc;
+		cm = cm > cols.cc ? cm : cols.cc;
+		cm = cm > cols.lc ? cm : cols.lc;
+		cm = cm > cols.wc ? cm : cols.wc;
+		cm = cm > cols.ml ? cm : cols.ml;
+
+		print_wc2(results[0], (WC_Results){cm,cm,cm,cm,cm}, options);
+		printf("%s\n", file_names[0]);
 	}
 
 	return 0;
