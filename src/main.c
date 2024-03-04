@@ -27,26 +27,6 @@ size_t uintlen(uint64_t val) {
 	return result;
 }
 
-// NOTE: Not beings used anymore!
-long unsigned int strlen(const char* s) {
-	if (s[0] == '\0') {
-		return 0;
-	}
-
-	long unsigned int result = 0;
-	int i = 0;
-	char c = 0;
-	
-	do {
-		result++;
-
-		i++;
-		c = s[i];
-	} while(c != '\0');
-
-	return result;
-}
-
 int strcmp(const char *lhs, const char *rhs) {
 	unsigned char lc, rc;
 	int i = 0;
@@ -58,7 +38,7 @@ int strcmp(const char *lhs, const char *rhs) {
 	} while (lc == rc && lc != '\0');
 
 		
-	return lc-rc;
+	return (int)lc-(int)rc;
 }
 
 int isspace(int ch) {
@@ -105,7 +85,7 @@ WC_Results wc2(char* buf) {
 	int i = 0, c = 0; // u, p
 
 	while(1) {
-		c = buf[i++];
+		c = buf[i];
 		if (c == '\0') {
 			break;
 		} else if (isspace(c)) {
@@ -126,11 +106,11 @@ WC_Results wc2(char* buf) {
 			word_length++;
 			line_length++;
 		}
-
+		i++;
 	}
 
-	result.bc = i+1;
-	result.cc = i+1;
+	result.bc = i;
+	result.cc = i;
 
 	return result;
 }
@@ -156,8 +136,8 @@ static inline WC_Results wc2_max_cols(WC_Results results, WC_Results cols) {
 	return cols;
 }
 
-void sprint_wc2_field(char* buf, uint64_t col, uint64_t field) {
-	int64_t padding = (int64_t)col - (int64_t)uintlen(field);
+void sprint_wc2_field(char* buf, uint64_t field, uint64_t width) {
+	int64_t padding = (int64_t)width - (int64_t)uintlen(field);
 	if (padding < 0) padding = 0;
 	for (int i = 0; i < padding; i++) {
 		buf[i] = ' ';
@@ -179,27 +159,33 @@ void print_wc2(WC_Results results, WC_Results cols, WC_Print_Options options) {
 		fprintf(stderr, "print_wc2(): Failed to allocate %zu bytes\n", buflen);
 		exit(1);
 	}
-
+	
+	uint64_t not_first = 0;
 	if (options & OPTION_LINE_COUNT) {
-		sprint_wc2_field(buf, cols.lc, results.lc);
-		printf("%s ", buf);
+		sprint_wc2_field(buf, results.lc, cols.lc+not_first);
+		printf("%s", buf);
+		not_first = 1;
 	}
 	if (options & OPTION_WORD_COUNT) {
-		sprint_wc2_field(buf, cols.wc, results.wc);
-		printf("%s ", buf);
+		sprint_wc2_field(buf, results.wc, cols.wc+not_first);
+		printf("%s", buf);
+		not_first = 1;
 	}
 	// NOTE: Currently incorrect, likely due to multi-byte characters
 	if (options & OPTION_CHAR_COUNT) {
-		sprint_wc2_field(buf, cols.cc, results.cc);
-		printf("%s ", buf);
+		sprint_wc2_field(buf, results.cc, cols.cc+not_first);
+		printf("%s", buf);
+		not_first = 1;
 	}
 	if (options & OPTION_BYTE_COUNT) {
-		sprint_wc2_field(buf, cols.bc, results.bc);
-		printf("%s ", buf);
+		sprint_wc2_field(buf, results.bc, cols.bc+not_first);
+		printf("%s", buf);
+		not_first = 1;
 	}
 	if (options & OPTION_LINE_LENGTH) {
-		sprint_wc2_field(buf, cols.ml, results.ml);
-		printf("%s ", buf);
+		sprint_wc2_field(buf, results.ml, cols.ml+not_first);
+		printf("%s", buf);
+		not_first = 1;
 	}
 
 	free(buf);
@@ -248,8 +234,8 @@ int main(int argc, char* argv[]) {
 					options |= OPTION_LINE_LENGTH;
 				}
 				else {
-					printf("wc2: invalid option: %s\n", arg);
-					printf("Try 'wc2 --help' for more information.\n");
+					fprintf(stderr, "wc2: invalid option: %s\n", arg);
+					fprintf(stderr, "Try 'wc2 --help' for more information.\n");
 					exit(1);
 				}
 			} else { // Handle - options
@@ -271,8 +257,8 @@ int main(int argc, char* argv[]) {
 							options |= OPTION_LINE_LENGTH;
 							break;
 						default:
-							printf("wc2: invalid option: %s\n", arg);
-							printf("Try 'wc2 --help' for more information.\n");
+							fprintf(stderr, "wc2: invalid option: %s\n", arg);
+							fprintf(stderr, "Try 'wc2 --help' for more information.\n");
 							exit(1);
 							break;
 					}
@@ -311,7 +297,7 @@ int main(int argc, char* argv[]) {
 			}
 			fclose(fstream);
 		} else {
-			printf("%s: No such file or directory\n", file_names[i]);			
+			fprintf(stderr, "%s: No such file or directory\n", file_names[i]);			
 		}
 	}
 
@@ -335,11 +321,11 @@ int main(int argc, char* argv[]) {
 		for (int i = 0; i < fn_len; i++) {
 			printf(" ");
 			print_wc2(results[i], cols, options);
-			printf("%s\n", file_names[i]);
+			printf(" %s\n", file_names[i]);
 		}
 		printf(" ");
 		print_wc2(total, cols, options);
-		printf("total\n");
+		printf(" total\n");
 	} else {
 		uint64_t cm = cols.bc;
 		cm = cm > cols.cc ? cm : cols.cc;
@@ -348,7 +334,9 @@ int main(int argc, char* argv[]) {
 		cm = cm > cols.ml ? cm : cols.ml;
 
 		print_wc2(results[0], (WC_Results){cm,cm,cm,cm,cm}, options);
-		printf("%s\n", file_names[0]);
+		if (file_names[0][0] != '\0') {
+			printf(" %s\n", file_names[0]);
+		}
 	}
 
 	return 0;
