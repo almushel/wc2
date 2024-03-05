@@ -4,6 +4,6 @@ Recreating the Unix `wc` utility.
 
 ## Limitations
 
-- No `--files0-from` option (TO-DO)
+- `--files0-from=` won't read from stdin (TO-DO)
 - No multi-byte character support (TO-DO)
 - No `--help` or `--version`

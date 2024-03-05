@@ -4,6 +4,14 @@
 
 #define array_len(arr) sizeof(arr) / sizeof(arr[0])
 
+#define da_push(arr, val, len, cap) \
+if (len >= cap) { \
+	cap *= 2; \
+	void* new_arr = realloc(arr, sizeof(arr[0]) * cap); \
+	if (new_arr) { arr = new_arr; } \
+} \
+arr[len++] = val
+
 typedef enum WC_Print_Options {
 	OPTION_BYTE_COUNT  = 1 << 0,	// -c, --bytes
 	OPTION_CHAR_COUNT  = 1 << 1,	// -m, --chars
@@ -16,6 +24,7 @@ typedef struct WC_Results {
 	uint64_t bc, cc, lc, wc, ml;
 } WC_Results;
 
+// Count the number of digits in an unsigned integer
 size_t uintlen(uint64_t val) {
 	size_t result = 0;
 
@@ -24,6 +33,19 @@ size_t uintlen(uint64_t val) {
 	}
 	while((val /= 10));
 
+	return result;
+}
+
+size_t strlen(const char* str) {
+	if (str == 0 || str[0] == '\0') {
+		return 0;
+	}
+	size_t result = 0;
+	char c = 0;
+	do {
+		c = str[result++];
+	} while (c != '\0');
+	
 	return result;
 }
 
@@ -50,6 +72,16 @@ int isspace(int ch) {
 		ch == '\t'	||
 		ch == '\v'
 	);	
+}
+
+int file_exists(const char* fn) {
+	FILE* stream = fopen(fn, "r");
+	if (stream != NULL) {
+		fclose(stream);
+		return 1;
+	}
+
+	return 0;
 }
 
 char* fread_all(FILE* stream, size_t* size) {
@@ -232,6 +264,34 @@ int main(int argc, char* argv[]) {
 				}
 				else if (strcmp(arg+2, "max-line-length") == 0) {
 					options |= OPTION_LINE_LENGTH;
+				} 
+				else if (strcmp(arg+2, "files0-from") == '=' && (arg+2)[strlen("files0-from")] == '=') {
+					char* f0f_filename = arg+strlen("--files0-from=");
+					FILE* f0f_stream = fopen(f0f_filename, "r");
+					if (f0f_stream != NULL) {
+						size_t len = 0;
+						char* f0f_list = fread_all(f0f_stream, &len);
+
+						if (file_exists(f0f_list)) {
+							da_push(file_names, f0f_list, fn_len, fn_cap);
+						} else {
+							fprintf(stderr, "%.*s: No such file or directory\n", 256, f0f_list);	
+						}
+
+						for (int i = 0; i < len-1; i++) {
+							if (f0f_list[i] == '\0') {
+								char* new_fn = f0f_list+i+1;
+								if (file_exists(new_fn)) {
+									da_push(file_names, new_fn, fn_len, fn_cap);
+								} else {
+									fprintf(stderr, "%.*s: No such file or directory\n", 256, new_fn);	
+								}
+							}
+						}
+						fclose(f0f_stream);
+					} else {
+						fprintf(stderr, "%.*s: No such file or directory\n", 256, file_names[i]);			
+					}
 				}
 				else {
 					fprintf(stderr, "wc2: invalid option: %s\n", arg);
@@ -265,14 +325,7 @@ int main(int argc, char* argv[]) {
 				}
 			} 
 		} else {
-			if(fn_len >= fn_cap) {
-				fn_cap *= 2;
-				char** fn_new = realloc(file_names, sizeof(char*) * fn_cap);
-				if (fn_new) {
-					file_names = fn_new;
-				}
-			}
-			file_names[fn_len++] = arg;
+			da_push(file_names, arg, fn_len, fn_cap);
 		}
 	}
 
@@ -297,7 +350,7 @@ int main(int argc, char* argv[]) {
 			}
 			fclose(fstream);
 		} else {
-			fprintf(stderr, "%s: No such file or directory\n", file_names[i]);			
+			fprintf(stderr, "%.*s: No such file or directory\n", 256, file_names[i]);
 		}
 	}
 
