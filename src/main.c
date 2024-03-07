@@ -267,7 +267,13 @@ int main(int argc, char* argv[]) {
 				} 
 				else if (strcmp(arg+2, "files0-from") == '=' && (arg+2)[strlen("files0-from")] == '=') {
 					char* f0f_filename = arg+strlen("--files0-from=");
-					FILE* f0f_stream = fopen(f0f_filename, "r");
+					FILE* f0f_stream = 0;
+					if (f0f_filename[0] == '-' && f0f_filename[1] == '\0') {
+						f0f_stream = stdin;	
+					} else {
+						f0f_stream = fopen(f0f_filename, "r");
+					}
+
 					if (f0f_stream != NULL) {
 						size_t len = 0;
 						char* f0f_list = fread_all(f0f_stream, &len);

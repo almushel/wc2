@@ -28,6 +28,11 @@ if [ -e $WC2 ] && [ -e $1 ]; then
 	printf "$1\0$1" > $BIN_DIR/files.txt
 	printf "\nRead file list from file\n"
 	print_wc2_results "$(wc --files0-from=$BIN_DIR/files.txt)" "$($WC2 --files0-from=$BIN_DIR/files.txt)"
+
+	# NOTE: Apparently, wc doesn't worry about padding or column alignment for file lists passed through stdin???
+	printf "\nRead file list from stdin\n"
+	print_wc2_results "$(printf "$1\0$1" | wc --files0-from=-)" "$(printf "$1\0$1" | $WC2 --files0-from=-)"
+
 else
 	printf "Test file $1 not found\n"
 fi
