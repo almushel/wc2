@@ -1,8 +1,8 @@
 # wc2
 
-Recreating the Unix `wc` utility.
+Recreating the Unix `wc` utility from scratch in C.
 
 ## Limitations
 
-- No multi-byte character support (TO-DO)
+- Some discrepancies in output formatting (column width and alignment)
 - No `--help` or `--version`

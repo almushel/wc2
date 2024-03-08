@@ -109,26 +109,20 @@ char* fread_all(FILE* stream, size_t* size) {
 	return result;
 }
 
-// TODO: Support for multi-byte characters
-WC_Results wc2(char* buf) {
+WC_Results wc2(const char* buf) {
 	WC_Results result = {};
 	uint64_t word_length = 0;
 	uint64_t line_length = 0;
-	int i = 0, c = 0; // u, p
 
-	while(1) {
-		c = buf[i];
-		if (c == '\0') {
-			break;
-		} else if (isspace(c)) {
-			// TODO: Handle goofy shit like \r\n line endings?
-			if (c == '\n') {
+	while(*buf != '\0') {
+		if (isspace(*buf)) {
+			if (*buf == '\n') {
 				if (line_length > result.ml) {
 					result.ml = line_length;
 				}
-				result.lc++;
 				line_length = 0;
-			}
+				result.lc++;
+			} else { line_length++; }
 
 			if (word_length > 0) {
 				result.wc++;
@@ -138,11 +132,15 @@ WC_Results wc2(char* buf) {
 			word_length++;
 			line_length++;
 		}
-		i++;
-	}
+		
+		// Most significant bit of a single byte character is 0
+		// Two most significant bits of the first byte of a multibyte character are 11
+		// Two most significant bits of subsequent bytes in a multibyte character are 10
+		if ((*buf & 0xC0) != 0x80) { result.cc++; }
+		result.bc++;
 
-	result.bc = i;
-	result.cc = i;
+		buf++;
+	}
 
 	return result;
 }
@@ -203,7 +201,6 @@ void print_wc2(WC_Results results, WC_Results cols, WC_Print_Options options) {
 		printf("%s", buf);
 		not_first = 1;
 	}
-	// NOTE: Currently incorrect, likely due to multi-byte characters
 	if (options & OPTION_CHAR_COUNT) {
 		sprint_wc2_field(buf, results.cc, cols.cc+not_first);
 		printf("%s", buf);
@@ -229,7 +226,7 @@ static inline WC_Results wc2_sum(WC_Results first, WC_Results second) {
 		.cc = first.cc + second.cc,
 		.lc = first.lc + second.lc,
 		.wc = first.wc + second.wc,
-		.ml = first.ml + second.ml
+		.ml = first.ml > second.ml ? first.ml : second.ml
 	};
 }
 
