@@ -4,16 +4,40 @@ BIN_DIR=$SCRIPT_DIR/../bin
 WC2=$BIN_DIR/wc2
 OPTIONS=-cmlwL
 
+param_cmp() {
+	IFS=' '
+	read -ra first <<< $1
+	read -ra second <<< $2
+
+	for i in "${!first[@]}"; do
+		if [ ${first[$i]} != ${second[$i]} ]; then
+			return 1
+		fi
+	done
+
+	return 0
+			
+}
+
+str_cmp() {
+	if [ "$1" = "$2" ]; then
+		return 0
+	fi
+	return 1
+}
+
 print_wc2_results() {
 	printf -- "-------------------\n"
-	if [ "$1" = "$2" ]
-	then 
-		printf "Result: PASS\n"
-	else 
+	param_cmp "$1" "$2"; VR=$?
+	str_cmp "$1" "$2"; FR=$?
+
+	if [ $VR != 0 ] || [ $FR != 0 ]; then 
 		printf "wc:\n$1\n\n"
 		printf "wc2:\n$2\n\n"
-		printf "Result: FAIL\n"
 	fi
+
+	if [ $VR = 0 ]; then printf "Values: PASS\n"; else printf "Values: FAIL\n"; fi
+	if [ $FR = 0 ]; then printf "Formatting: PASS\n"; else printf "Formatting: FAIL\n"; fi
 	printf -- "-------------------\n"
 }
 
