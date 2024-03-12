@@ -109,7 +109,7 @@ char* fread_all(FILE* stream, size_t* size) {
 	return result;
 }
 
-WC_Results wc2(const char* buf) {
+WC_Results wc2_buf(const char* buf) {
 	WC_Results result = {};
 	uint64_t word_length = 0;
 	uint64_t line_length = 0;
@@ -145,6 +145,45 @@ WC_Results wc2(const char* buf) {
 	return result;
 }
 
+WC_Results wc2_fstream(FILE* stream) {
+	char buf[1024];
+	WC_Results result = {};
+	uint64_t word_length = 0, line_length = 0, bytes_read = 0;
+	
+	while (bytes_read = fread(buf, sizeof(char), array_len(buf), stream)) {
+		for (int i = 0, c = 0; i < bytes_read; i++){
+			c = buf[i];
+
+			if (isspace(c)) {
+				if (c == '\n') {
+					if (line_length > result.ml) {
+						result.ml = line_length;
+					}
+					line_length = 0;
+					result.lc++;
+				} else { line_length++; }
+
+				if (word_length > 0) {
+					result.wc++;
+				}
+				word_length = 0;
+			} else {
+				word_length++;
+				line_length++;
+			}
+			
+			// Most significant bit of a single byte character is 0
+			// Two most significant bits of the first byte of a multibyte character are 11
+			// Two most significant bits of subsequent bytes in a multibyte character are 10
+			if ((c & 0xC0) != 0x80) { result.cc++; }
+		}
+
+		result.bc += bytes_read;
+	}
+
+
+	return result;
+}
 static inline WC_Results wc2_max_cols(WC_Results results, WC_Results cols) {
 	uint64_t col = 0;
 	if ( cols.bc < (col = uintlen(results.bc))) {
@@ -275,20 +314,12 @@ int main(int argc, char* argv[]) {
 						size_t len = 0;
 						char* f0f_list = fread_all(f0f_stream, &len);
 
-						if (file_exists(f0f_list)) {
-							da_push(file_names, f0f_list, fn_len, fn_cap);
-						} else {
-							fprintf(stderr, "%.*s: No such file or directory\n", 256, f0f_list);	
-						}
-
+						da_push(file_names, f0f_list, fn_len, fn_cap);
 						for (int i = 0; i < len-1; i++) {
 							if (f0f_list[i] == '\0') {
 								char* new_fn = f0f_list+i+1;
-								if (file_exists(new_fn)) {
-									da_push(file_names, new_fn, fn_len, fn_cap);
-								} else {
-									fprintf(stderr, "%.*s: No such file or directory\n", 256, new_fn);	
-								}
+								da_push(file_names, f0f_list+i+1, fn_len, fn_cap);
+									
 							}
 						}
 						fclose(f0f_stream);
@@ -298,7 +329,7 @@ int main(int argc, char* argv[]) {
 				}
 				else {
 					fprintf(stderr, "wc2: invalid option: %s\n", arg);
-					fprintf(stderr, "Try 'wc2 --help' for more information.\n");
+					fprintf(stderr, "Try 'wc --help' for more information.\n");
 					exit(1);
 				}
 			} else { // Handle - options
@@ -321,7 +352,7 @@ int main(int argc, char* argv[]) {
 							break;
 						default:
 							fprintf(stderr, "wc2: invalid option: %s\n", arg);
-							fprintf(stderr, "Try 'wc2 --help' for more information.\n");
+							fprintf(stderr, "Try 'wc --help' for more information.\n");
 							exit(1);
 							break;
 					}
@@ -336,37 +367,29 @@ int main(int argc, char* argv[]) {
 		options = OPTION_LINE_COUNT | OPTION_WORD_COUNT | OPTION_BYTE_COUNT;
 	}
 
-	WC_Results* results = malloc(sizeof(WC_Results) * (fn_len+1));
+	WC_Results* results = calloc(fn_len+1, sizeof(WC_Results));
 	WC_Results total = {}, cols = {};
 
 	for (int i = 0; i < fn_len; i++) {
 		FILE* fstream = fopen(file_names[i], "r");
 		if (fstream != NULL) {
-			size_t len = 0;
-			char* buf = fread_all(fstream, &results[i].bc);
-
-			if (results[i].bc > 0) {
-				results[i] = wc2(buf);
-				cols = wc2_max_cols(results[i], cols);
-				total = wc2_sum(total, results[i]);
-				free(buf);
-			}
+			results[i] = wc2_fstream(fstream);
+			cols = wc2_max_cols(results[i], cols);
+			total = wc2_sum(total, results[i]);
 			fclose(fstream);
 		} else {
-			fprintf(stderr, "%.*s: No such file or directory\n", 256, file_names[i]);
+			fprintf(stderr, "wc2: %.*s: No such file or directory\n", 256, file_names[i]);
 		}
 	}
 
 	if (fn_len == 0) {
-		char* buf = fread_all(stdin, &results[0].bc);
+		results[0] = wc2_fstream(stdin);
 		if (results[0].bc > 0) {
-			results[0] = wc2(buf);
 			cols = (WC_Results){7,7,7,7,7};
 			cols = wc2_max_cols(results[0], cols);
 
 			file_names[0] = "";
 			fn_len++;
-			free(buf);
 		}
 	}
 
@@ -382,7 +405,7 @@ int main(int argc, char* argv[]) {
 		printf(" ");
 		print_wc2(total, cols, options);
 		printf(" total\n");
-	} else {
+	} else if (results[0].bc) {
 		uint64_t cm = cols.bc;
 		cm = cm > cols.cc ? cm : cols.cc;
 		cm = cm > cols.lc ? cm : cols.lc;

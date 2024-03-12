@@ -36,13 +36,10 @@ print_wc2_results() {
 		printf "wc2:\n$2\n\n"
 	fi
 
-	if [ $VR = 0 ]; then printf "Values: PASS\n"; else printf "Values: FAIL\n"; fi
+	if [ $VR = 0 ]; then printf "Values: PASS | "; else printf "Values: FAIL | "; fi
 	if [ $FR = 0 ]; then printf "Formatting: PASS\n"; else printf "Formatting: FAIL\n"; fi
 	printf -- "-------------------\n"
 }
-
-# NOTE: Tests currently fail for >2 inputs for both multiple file and --files0-from
-# Difference between outputs is not visible to the eye, so it's probably some whitespace somewhere
 
 if [ -e $WC2 ] && [ -e $1 ]; then 
 	printf "\nSingle file input\n"
